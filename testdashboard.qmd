@@ -1,0 +1,36 @@
+---
+title: "dashboard test"
+format: dashboard
+---
+
+# Page 1
+
+## {height=30%}
+
+### 
+```{r}
+plot(cars)
+```
+
+###
+```{r}
+plot(cars)
+```
+
+###
+```{r}
+plot(cars)
+```
+
+## {height=70%}
+
+### {width=70%}
+```{r}
+plot(cars)
+```
+### {width=30%}
+```{r}
+plot(cars)
+```
+
+# Page 2

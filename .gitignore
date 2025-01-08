@@ -1,0 +1,15 @@
+#` ignore certain hidden files
+._*
+.DS_Store
+.Rhistory
+
+
+#` ignore all logs
+*.log
+
+#` ignore all rendered markdowns
+*.html
+
+#` ignore all Rshiny or dashboard generated folders
+*dashboard_*/
+*shiny_*
