@@ -21,7 +21,7 @@ PlotVennFromDT <- function(dt, valueCol, groupCol, filename){
 
 
 ### QC PLOTS (Bar, pca, correlation, heatmap)
-PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, groupLabel = "Treatment", dataName = ""){
+PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, groupLabel = "Treatment", dataName = "", showReplicateLegend = F){
   
   # Expects GROUP (conditions), RUN (unique runs), Protein or PEPTIDE from MSStats output
   # Detects protein or feature table,  plotType should be provided as "count" or "intensity" or a column name
@@ -60,13 +60,16 @@ PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, grou
   
   qcPlot <- qcPlot +
     geom_bar(position = "dodge", stat="identity") +
-    xlab(paste0("Runs grouped by ", groupLabel))+
+    xlab(paste0("Runs Grouped by ", groupLabel))+
     theme_classic() +
-    theme(legend.position = "none", axis.text.x=element_blank(), axis.ticks.x=element_blank(), 
-          text = element_text(family = "mono" ), plot.title = element_text(size = 18, hjust = 0.5),
+    theme(text = element_text(family = "mono" ), plot.title = element_text(size = 18, hjust = 0.5),
           axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15))) +
     facet_wrap(~GROUP, nrow=1, strip.position = "bottom") +
     theme(strip.placement = "outside")
+  
+  if (showReplicateLegend){
+    qcPlot <- qcPlot + theme(legend.position = "none", axis.text.x=element_blank(), axis.ticks.x=element_blank())
+  }
   
   if (!is.na(colorsManual[[1]])){
     qcPlot <- qcPlot + scale_fill_manual(values = colorsManual)
