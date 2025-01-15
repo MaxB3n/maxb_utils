@@ -39,7 +39,7 @@ PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, grou
   msstTable[, Rep := as.character(as.numeric(as.character(RUN)) %% (nun(RUN)/nun(GROUP)))]
   
   barTable <- msstTable[, .(.N, "SumLogIntensities" = sum(LogIntensities)), by = .(Rep, GROUP)]
-  str(barTable)
+  #str(barTable)
   
   switch(plotType,
          count={qcPlot <- ggplot( barTable, aes(x=Rep, y=N, fill = Rep) ) +
@@ -67,7 +67,7 @@ PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, grou
     facet_wrap(~GROUP, nrow=1, strip.position = "bottom") +
     theme(strip.placement = "outside")
   
-  if (showReplicateLegend){
+  if (!showReplicateLegend){
     qcPlot <- qcPlot + theme(legend.position = "none", axis.text.x=element_blank(), axis.ticks.x=element_blank())
   }
   
