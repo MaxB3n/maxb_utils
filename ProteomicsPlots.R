@@ -21,7 +21,7 @@ PlotVennFromDT <- function(dt, valueCol, groupCol, filename){
 
 
 ### QC PLOTS (Bar, pca, correlation, heatmap)
-PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, groupLabel = "Treatment", dataName = "", showReplicateLegend = F){
+PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, groupLabel = "Treatment", dataName = "", showReplicateLegend = F, face = "mono"){
   
   # Expects GROUP (conditions), RUN (unique runs), Protein or PEPTIDE from MSStats output
   # Detects protein or feature table,  plotType should be provided as "count" or "intensity" or a column name
@@ -36,7 +36,7 @@ PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, grou
   }
   
   msstTable <- msstTable[!is.na(LogIntensities),]
-  msstTable[, Rep := as.character(as.numeric(as.character(RUN)) %% (nun(RUN)/nun(GROUP)))]
+  msstTable[, Rep := as.character(as.numeric(as.character(RUN)) %% (nun(RUN)/nun(GROUP)) +1)]
   
   barTable <- msstTable[, .(.N, "SumLogIntensities" = sum(LogIntensities)), by = .(Rep, GROUP)]
   #str(barTable)
@@ -62,7 +62,7 @@ PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, grou
     geom_bar(position = "dodge", stat="identity") +
     xlab(paste0("Runs Grouped by ", groupLabel))+
     theme_classic() +
-    theme(text = element_text(family = "mono" ), plot.title = element_text(size = 18, hjust = 0.5),
+    theme(text = element_text(family = face ), plot.title = element_text(size = 18, hjust = 0.5),
           axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15))) +
     facet_wrap(~GROUP, nrow=1, strip.position = "bottom") +
     theme(strip.placement = "outside")
@@ -80,7 +80,7 @@ PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, grou
 }
 
 PlotQcHeatmap <- function(mat, scale = "Log2 Intensities", showrn = F, csplit = F, title = "", 
-                          legendRange = colorRamp2(quantile(mat, probs = c(0.015, 0.5, 0.985),na.rm = T), c( "blue", "white", "red")), row_names_gp = gpar(fontfamily = "mono"),
+                          legendRange = colorRamp2(quantile(mat, probs = c(0.015, 0.5, 0.985),na.rm = T), c( "blue", "white", "red")), row_names_gp = gpar(fontfamily = face), face = face,
                           cluster_rows = rowClusterWithNA(mat)){
   
   if (is.character(csplit) & length(csplit) == ncol(mat) ){
@@ -96,7 +96,7 @@ PlotQcHeatmap <- function(mat, scale = "Log2 Intensities", showrn = F, csplit = 
                     cluster_columns = F,
                     column_split = csplit,                    
                     column_names_rot = 75,
-                    column_names_gp = gpar(fontfamily = "mono"), row_names_gp = row_names_gp,
+                    column_names_gp = gpar(fontfamily = face), row_names_gp = row_names_gp,
                     raster_by_magick = T) 
   } else {
     hmap <- Heatmap(mat, 
@@ -109,14 +109,14 @@ PlotQcHeatmap <- function(mat, scale = "Log2 Intensities", showrn = F, csplit = 
                     show_column_names = T,
                     cluster_columns = T,
                     column_names_rot = 75,
-                    column_names_gp = gpar(fontfamily = "mono"), row_names_gp = row_names_gp, column_title_gp = gpar(fontfamily = "mono", fontsize = 16.5),
+                    column_names_gp = gpar(fontfamily = face), row_names_gp = row_names_gp, column_title_gp = gpar(fontfamily = face, fontsize = 16.5),
                     raster_by_magick = T) 
   }
     return(hmap)
 }
   
 
-PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F ){
+PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F, face = face){
     
     v <- ggplot(table[Label == condition, ], aes(x = log2FC, y = -log10(adj.pvalue), color = Effect)) + 
     geom_point( alpha = 0.35, shape = 19, size = 0.8) + 
@@ -133,7 +133,7 @@ PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F ){
                color = "grey24", size=0.5) +
     ggtitle(paste("Significant", sprintf("(adj.pval < , )", apValT, l2fcT), "Proteins in", condition)) +
     theme(legend.position = "none",
-          text = element_text(family = "mono" ), plot.title = element_text(size = 18, hjust = 0.5),
+          text = element_text(family = face ), plot.title = element_text(size = 18, hjust = 0.5),
           axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15))) #+
     
     if (repel){
