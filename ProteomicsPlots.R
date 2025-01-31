@@ -80,7 +80,7 @@ PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, grou
 }
 
 PlotQcHeatmap <- function(mat, scale = "Log2 Intensities", showrn = F, csplit = F, title = "", 
-                          legendRange = colorRamp2(quantile(mat, probs = c(0.015, 0.5, 0.985),na.rm = T), c( "blue", "white", "red")), row_names_gp = gpar(fontfamily = face), face = face,
+                          legendRange = colorRamp2(quantile(mat, probs = c(0.015, 0.5, 0.985),na.rm = T), c( "blue", "white", "red")), row_names_gp = gpar(fontfamily = face), face = "sans",
                           cluster_rows = rowClusterWithNA(mat)){
   
   if (is.character(csplit) & length(csplit) == ncol(mat) ){
@@ -109,14 +109,14 @@ PlotQcHeatmap <- function(mat, scale = "Log2 Intensities", showrn = F, csplit = 
                     show_column_names = T,
                     cluster_columns = T,
                     column_names_rot = 75,
-                    column_names_gp = gpar(fontfamily = face), row_names_gp = row_names_gp, column_title_gp = gpar(fontfamily = face, fontsize = 16.5),
+                    column_names_gp = gpar(fontfamily = face), row_names_gp = row_names_gp, column_title_gp = gpar(fontfamily = face),
                     raster_by_magick = T) 
   }
     return(hmap)
 }
   
 
-PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F, face = face){
+PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F, face = "mono"){
     
     v <- ggplot(table[Label == condition, ], aes(x = log2FC, y = -log10(adj.pvalue), color = Effect)) + 
     geom_point( alpha = 0.35, shape = 19, size = 0.8) + 
@@ -131,7 +131,7 @@ PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F, f
                color = "grey24", size=0.5) +
     geom_hline(yintercept = -log10(apValT), linetype="dashed", 
                color = "grey24", size=0.5) +
-    ggtitle(paste("Significant", sprintf("(adj.pval < , )", apValT, l2fcT), "Proteins in", condition)) +
+    ggtitle(paste("Significant", sprintf("(adj.pval < %s, abs(l2fc) > %s)", apValT, l2fcT), "Proteins in", condition)) +
     theme(legend.position = "none",
           text = element_text(family = face ), plot.title = element_text(size = 18, hjust = 0.5),
           axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15))) #+
@@ -145,7 +145,30 @@ PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F, f
 }
   
   
+PlotCorrelationMatrix <- function(){
   
+  Heatmap(corMat, 
+          name = "Spearman \nCorrelation",
+          col =  colorRamp2(c(0.89, 0.99), c( "seashell", "red")),
+          cluster_columns = F, cluster_rows = F,
+          column_gap = unit(1, "mm"), row_gap = unit(1, "mm"),
+          column_split = rep(as.character(1:8), each = 3),  row_split = rep(as.character(1:8), each = 3),
+          row_title = rep("",8), column_title = c("Protein Intensity Correlation Matrix"),
+          show_row_names = T, show_column_names = T, row_names_side = "left",
+          column_names_rot = 75,
+          column_names_gp = gpar(fontfamily = face), row_names_gp = gpar(fontfamily = face),
+          column_title_gp = gpar(fontfamily = face),
+          raster_by_magick = T,
+          cell_fun = function(j, i, x, y, w, h, col) { # add text to each grid
+            if(i >= j) {
+              grid.rect(x, y, w, h, gp = gpar(fill = col, col = col))
+              grid.text(round(corMat[i, j], 2), x, y, gp = gpar(fontfamily = face, fontsize = 8)) 
+            } else{
+              grid.rect(x, y, w, h, gp = gpar(fill = "white", col = "white"))
+            }
+          })
+  
+}  
   
   
   
