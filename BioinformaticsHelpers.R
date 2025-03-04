@@ -179,6 +179,14 @@ formatSpcTable <- function(spectralCounts){
   return(spcTable)
 }
 
+# VERSION 2
+formatSpcTable_v2 <- function(spectralCounts){
+  spcTable <- melt(spectralCounts[2:nrow(spectralCounts),], id.vars = c("PROTID","GENEID","PROTLEN"))
+  setnames(spcTable, c("PROTID","GENEID","PROTLEN","variable","value"), c("Prey","PreyGene","PreyLength","RunName","SpCount"))
+  spcTable[, c("Batch", "Bait", "Treatment", "Replicate") := tstrsplit(RunName, split="_")[1:4] ]
+  return(spcTable)
+}
+
 # Run SAINTexpressR
 runSaintExpressR_onSpcTable <- function(spcTable = NULL, pseudoControls = NULL){
     if (is.null(spcTable) ){
@@ -191,7 +199,7 @@ runSaintExpressR_onSpcTable <- function(spcTable = NULL, pseudoControls = NULL){
   interactionsTable <- unique(spcTable[, .(RunName, Bait, Prey, as.numeric(SpCount))])
   setnames(interactionsTable, c("RunName", "Bait", "Prey", "V4"), c("run", "bait", "prey", "spc"))
   if (is.null(pseudoControls)){
-    baitsTable[bait == "Control", treatment := "C"] #[, bait := tstrsplit(run, split = "_", keep = 2)[[1]]]
+    baitsTable[bait %in% c("Control","MDA","MDACONT","Control_DMSO","Control_VRST","MDA_VRST","MDA_DMSO"), treatment := "C"] #[, bait := tstrsplit(run, split = "_", keep = 2)[[1]]]
     saintOut <- SaintExpressR.SPC(interactionsTable, baitsTable, preysTable, fixedBeta1 = -4.6)
     #experimentalControlsTable <- spcTable[, .(RunName, Prey, Batch)] [spcTable[Bait == "Control", .(mean(as.numeric(SpCount)), var(as.numeric(SpCount))), by = .(Prey, Batch)], c("mean","omega") := .( i.V1, 1-sqrt(i.V1/i.V2)), on = .(Batch = Batch, Prey = Prey)] [!is.finite(omega), omega := 1.1] [, Batch := NULL]
     #setnames(experimentalControlsTable, c("run", "prey", "mean", "omega"))

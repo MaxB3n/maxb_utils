@@ -21,7 +21,7 @@ PlotVennFromDT <- function(dt, valueCol, groupCol, filename){
 
 
 ### QC PLOTS (Bar, pca, correlation, heatmap)
-PlotQCBar <- function( msstatsTable, plotType = "count", colorsManual = NA, groupLabel = "Treatment", dataName = "", showReplicateLegend = F, face = "mono"){
+PlotQCBar <- function( msstatsTable, plotType = c("count","intensity"), colorsManual = NA, groupLabel = "Treatment", dataName = "", showReplicateLegend = F, face = "mono"){
   
   # Expects GROUP (conditions), RUN (unique runs), Protein or PEPTIDE from MSStats output
   # Detects protein or feature table,  plotType should be provided as "count" or "intensity" or a column name
@@ -136,8 +136,15 @@ PlotVolcano <- function(table, condition, l2fcT = 1, apValT = 0.05, repel = F, f
           text = element_text(family = face ), plot.title = element_text(size = 18, hjust = 0.5),
           axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15))) #+
     
-    if (repel){
-    v <- v + geom_label_repel(aes( x = log2FC, y = -log10(adj.pvalue), color = Effect, label = Gene),
+    if (is.numeric(repel)){
+    #print("starting to calculate repel label positions... this might take a while")
+    table[, rank := 0][Significant == T & is.finite(log2FC), rank := abs(-log10(adj.pvalue)*log2FC)]
+    setorder(table, rank)
+    #table[1:(nrow(table)-repel)]
+    #print(unique(table$Gene))
+    tmp <- table[(nrow(table)-repel):nrow(table),]
+    print(unique(tmp$Gene))
+    v <- v + geom_label_repel(  data = table[(nrow(table)-repel):nrow(table),], mapping = aes( x = log2FC, y = -log10(adj.pvalue), color = Effect, label = Gene, size = 8),
                               box.padding = 0.3, max.overlaps = 15)
     }
     

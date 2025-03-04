@@ -8,6 +8,22 @@ substrRight <- function(string,start,stop = 0){
   return(substr(string, l+start+1, l+stop))
 }
 
+substrLeft <- function(string,start,stop = 0){
+  #expects negative numbers
+  l <- nchar(string)
+  return(substr(string, start, l+stop))
+}
+
+
+collapseVecPairwise <- function(vec, sep = "_"){
+  n <- length(vec)
+  if (n==2){
+    return( paste(vec[1], vec[2], sep = sep) )
+  } else {
+    return( c( paste(vec[1], vec[2:n], sep = sep), collapseVecPairwise( vec[2:n], sep = sep )) )
+  }
+}
+
 
 LoadPackagesFromCSV <- function(fpath, inclBioc = T){
   s
