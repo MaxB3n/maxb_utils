@@ -16,9 +16,12 @@ SimplifyCommon <- function(lst){
 # Specifically, whether all runs/replicates of a condition have a protein present
 LabelComplete <- function(results, intens){
   
-  infComplete <- intens[!is.na(LogIntensities), .N, by = .(GROUP, Protein)][, .(Protein, N, Complete = N == max(N)), by = GROUP]
+  infComplete <- intens[!is.na(LogIntensities), .N, by = .(GROUP, Protein)][, .(Protein, N, Complete = N == max(N)), by = .(GROUP)]
   results[infComplete, PositiveComplete := i.Complete, on = .(PositiveCondition = GROUP, Protein = Protein)]
   results[infComplete, NegativeComplete := i.Complete, on = .(NegativeCondition = GROUP, Protein = Protein)]
+  results[is.na(NegativeComplete), NegativeComplete := F]
+  results[is.na(PositiveComplete), PositiveComplete := F]
+  
   
   return(results)
 }
@@ -212,5 +215,176 @@ runSaintExpressR_onSpcTable <- function(spcTable = NULL, pseudoControls = NULL){
 }
 
 
-# Create two file folders with int and spc files ready to run with saint
+
+######
+###### Saint from evidence file
+######
+
+# clean evidence file
+#' @param evidence Maxquant evidence file as a data.table object, supply fread("evidence.txt") if evidence hasn't already been loaded into R
+#' @param saveDir file path to save the evidence_sub and keys files to. default NULL saves to cwd.
+#' @param keysRegex list of patterns c(x,y,z,...) to match in evidence$Experiment, write a separate keys file for each subset
+#' @param controlRegex single pattern to match in evidence$Experiment demarcating the control conditions. Use un-escaped '|' to match multiple patterns.
+#' @param prefix optional file name prefix for the evidence_sub.txt and keys.txt files.
+cleanEvdc <- function(evidence, saveDir = NULL, keysRegex = NULL, controlRegex = "Control|CONTROL|Ctrl|CTRL", prefix=""){
+  
+  # remove missing values from evidence file
+  evidence_sub <- evidence[-which(is.na(evidence$Intensity)), ]
+  # check contaminate
+  contaminate <- c("O77727", "P00698", "P00761", "P00883", "P02662", "P02663", "P02666", "P02668", "P02769")
+  # check Leading proteins format
+  if(any(grepl("sp\\|", evidence_sub$`Leading proteins`))) {
+    evidence_sub$`Leading proteins` <- gsub('([a-z,0-9,A-Z,\\_]+\\|{1})([A-Z,0-9,\\_]+)(\\|[A-Z,a-z,0-9,_]+)',
+                                            '\\2',
+                                            evidence_sub$`Leading proteins`) }
+  if(any(contaminate %in% evidence_sub$`Leading proteins`)) {
+    evidence_sub$`Leading proteins`[which(evidence_sub$`Leading proteins` %in% contaminate)] <- 
+      paste("CON__", evidence_sub$`Leading proteins`[which(evidence_sub$`Leading proteins` %in% contaminate)], sep = "") }
+  
+  if (!is.null(saveDir)){
+    # Navigate to write directory
+    tmp <- getwd()
+    setwd(saveDir)
+    # Save cleaned evidence file
+    write.table(evidence_sub, paste0(prefix,"evidence_sub.txt"), sep = "\t", row.names = F, quote = F)
+    # Make keys
+    keys <- unique(evidence[,.("Condition" = substrLeft(Experiment,start = 1, stop = -3), "BioReplicate" = Experiment), by = `Raw file`]) [, c("IsotopeLabelType", "Run") := .("L",1:nun(`Raw file`))]
+    keys[, SAINT := "T"][grepl(controlRegex, Condition), SAINT := "C"]
+    setnames(keys, "Raw file", "RawFile")
+    #print(colnames(keys))
+    setcolorder(keys, c(	"RawFile", "IsotopeLabelType",	"Condition", "BioReplicate",		"Run", "SAINT"))
+    
+    # Save keys file
+    if (is.null(keysRegex)){
+      write.table(keys, paste0(prefix,"keys.txt"), sep = "\t", row.names = F, quote = F)
+    } else {
+      for (pattern in keysRegex){
+        write.table(keys[grepl(pattern,Condition),], paste0(prefix,"keys_", pattern,".txt"), sep = "\t", row.names = F, quote = F)
+      }
+    } 
+    setwd(tmp)
+  } else{
+    return(evidence_sub)
+  }
+}
+
+# write input files for saint 
+prepSaintInputFromEvdc <- function(evidencefile, keysfile, fastafile, msDataType="spc", prefix=""){
+  artmsEvidenceToSaintExpress(evidence_file=evidencefile,
+                              keys_file=keysfile,
+                              ref_proteome_file=fastafile,
+                              quant_variable= paste0("ms",msDataType), output_file=paste0(prefix, msDataType, ".txt"), verbose = TRUE)
+}
+
+# Run SaintExpress from command line 
+callSAINTexpress <- function(baitfile = "saint-baits.txt", preyfile = "saint-preys.txt", interactionfile = "saint-interactions.txt", 
+                             prefix = "", msDataType="spc", fileName="SAINTexpressScores.txt"){
+  
+  interactionfile <- paste(prefix, msDataType, interactionfile, sep = "-")
+  preyfile <- paste(prefix, msDataType, preyfile, sep = "-")
+  baitfile <- paste(prefix, msDataType, baitfile, sep = "-")
+  
+  saintProgram <- paste0("SAINTexpress-", msDataType,"deprecated")
+  command <- paste(saintProgram, interactionfile, preyfile, baitfile)
+  system(command)
+  system(paste("mv list.txt", fileName))
+}
+
+#runApms_AnalysisOnMaxquant
+
+#runApms_AnalysisOnMultiMaxquant
+
+#' @param genes vector of gene names to limit string to
+#' @param links.path path to string links file, 
+#'                   example https://stringdb-downloads.org/download/protein.physical.links.detailed.v12.0/9606.protein.physical.links.detailed.v12.0.txt.gz
+#' @param info.path path to string file with gene name etc info
+#'                  example https://stringdb-downloads.org/download/protein.info.v12.0/9606.protein.info.v12.0.txt.gz
+#'                  or a data.table with columns `#string_protein_id` and `preferred_name`                  
+#' @param combinedScoreThreshold only edges with combined score above this will be considered
+#' @param stringDistThreshold protein pairs greater distance than this will be called a decoy
+#' @param geneAliasFunction a function that will convert a list of genes to the canonical alias
+#'                          `function(charGeneVector){... return(charGeneAliasVector)}`
+#'                          The default, `identity`, is no conversion
+#'                          See function `github/kroganlab/bp_utils/UniprotIDMapping.R :: geneAlias2officialGeneSymbol` as an example/possible
+decoysFromString <- function (genes, 
+                              links.path = "~/Downloads/9606.protein.physical.links.detailed.v12.0.txt.gz",
+                              info.path = "~/Downloads/9606.protein.info.v12.0.txt.gz",
+                              combinedScoreThreshold = 600,
+                              stringDistThreshold = 5,
+                              geneAliasFunction = identity){
+  genes <- unique(genes)
+  # remove KRT contaminants
+  genes <- grep("^KRT", genes, invert = TRUE, value = TRUE)
+  
+  
+  string <- fread (links.path)
+  string <- string[combined_score > combinedScoreThreshold  ]
+  
+  if (!"data.table" %in% class(info.path)){
+    proteinNames <- fread (info.path)
+  }else{
+    proteinNames <- info.path
+  }
+  string[proteinNames, gene1 := i.preferred_name , on = c(protein1 = "#string_protein_id")]
+  string[proteinNames, gene2 := i.preferred_name , on = c(protein2 = "#string_protein_id")]
+  
+  string[, alias1 := geneAliasFunction(gene1)]
+  string[, alias2 := geneAliasFunction(gene2)]
+  g <- igraph::graph_from_data_frame(string[, .(alias1, alias2)], directed = FALSE)
+  # find distant genes in string
+  rm.na <- function(x)x[!is.na(x)]
+  dists <- igraph::distances(g, 
+                             rm.na (match( genes, names(igraph::V(g)))),
+                             rm.na (match( genes, names(igraph::V(g)))))
+  distantGenes <- which(dists > stringDistThreshold, arr.ind = TRUE) |> as.data.table(keep.rownames = TRUE)
+  print(str(distantGenes))
+  # distantGenes is a data.table with columns rn, row, col. 
+  # row and col are indeces to dimensions of dists matrix
+  setnames(distantGenes, old = "rn", new = "gene1", )
+  distantGenes[, gene2 := colnames(dists)[col]]
+  
+  decoys <- unique(distantGenes[, .(gene1, gene2)]) #unique(distantGenes[gene1 < gene2, .(gene1, gene2)])
+  return (decoys)
+}
+
+neighborhoodFromString <- function (genes, 
+                              links.path = "~/Downloads/9606.protein.physical.links.detailed.v12.0.txt.gz",
+                              info.path = "~/Downloads/9606.protein.info.v12.0.txt.gz",
+                              combinedScoreThreshold = 600,
+                              stringDistThreshold = 1,
+                              geneAliasFunction = identity){
+  genes <- unique(genes)
+  # remove KRT contaminants
+  genes <- grep("^KRT", genes, invert = TRUE, value = TRUE)
+  
+  
+  string <- fread (links.path)
+  string <- string[combined_score > combinedScoreThreshold  ]
+  
+  if (!"data.table" %in% class(info.path)){
+    proteinNames <- fread (info.path)
+  }else{
+    proteinNames <- info.path
+  }
+  string[proteinNames, gene1 := i.preferred_name , on = c(protein1 = "#string_protein_id")]
+  string[proteinNames, gene2 := i.preferred_name , on = c(protein2 = "#string_protein_id")]
+  
+  string[, alias1 := geneAliasFunction(gene1)]
+  string[, alias2 := geneAliasFunction(gene2)]
+  g <- igraph::graph_from_data_frame(string[, .(alias1, alias2)], directed = FALSE)
+  # find distant genes in string
+  rm.na <- function(x)x[!is.na(x)]
+  dists <- igraph::distances(g, 
+                             rm.na (match( genes, names(igraph::V(g)))),
+                             rm.na (match( genes, names(igraph::V(g)))))
+  neighborGenes <- which(dists <= stringDistThreshold, arr.ind = TRUE) |> as.data.table(keep.rownames = TRUE)
+  print(str(neighborGenes))
+  # neighborGenes is a data.table with columns rn, row, col. 
+  # row and col are indeces to dimensions of dists matrix
+  setnames(neighborGenes, old = "rn", new = "gene1", )
+  neighborGenes[, gene2 := colnames(dists)[col]]
+  
+  neighbors <- unique(neighborGenes[, .(gene1, gene2)]) #unique(neighborGenes[gene1 < gene2, .(gene1, gene2)])
+  return (neighbors)
+}
 

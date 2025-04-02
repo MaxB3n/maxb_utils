@@ -4,8 +4,8 @@ nun <- function(lst){
 
 substrRight <- function(string,start,stop = 0){
   #expects negative numbers
-  l <- nchar(string)
-  return(substr(string, l+start+1, l+stop))
+  l <- nchar( string )
+  return( substr(string, l+start+1, l+stop) )
 }
 
 substrLeft <- function(string,start,stop = 0){
@@ -14,6 +14,16 @@ substrLeft <- function(string,start,stop = 0){
   return(substr(string, start, l+stop))
 }
 
+#' @param replace 2 column data frame/table with the recognition patterns in the first columns and replacements in the second column. 
+#' @param remove a character vector of strings to remove
+multiGsub <- function (characterVector, replace, remove = ""){
+  characterVector <- gsub(remove, "", characterVector)
+  for (x in 1:nrow(replace)){
+    print(x)
+    characterVector <- ifelse(grepl(replace[x,1],characterVector), gsub(replace[x,1], replace[x,2],characterVector),characterVector)
+  }
+  return(characterVector)
+}
 
 collapseVecPairwise <- function(vec, sep = "_"){
   n <- length(vec)
